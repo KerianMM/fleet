@@ -1,0 +1,12 @@
+default:
+  suites:
+    register_vehicle:
+      paths:
+        - "%paths.base%/tests/Integration/RegisterVehicle"
+      contexts:
+        - Kerianmm\Fleet\Tests\Integration\RegisterVehicle\RegisterVehicleContext
+    park_vehicle:
+      paths:
+        - "%paths.base%/tests/Integration/ParkVehicle"
+      contexts:
+        - Kerianmm\Fleet\Tests\Integration\ParkVehicle\ParkVehicleContext

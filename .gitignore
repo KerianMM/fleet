@@ -1,0 +1,12 @@
+vendor
+
+tools/*/vendor
+tools/*.phar
+
+.phpunit.cache
+.infection
+
+###> friendsofphp/php-cs-fixer ###
+.php_cs.cache
+.php-cs-fixer.cache
+###< friendsofphp/php-cs-fixer ###
