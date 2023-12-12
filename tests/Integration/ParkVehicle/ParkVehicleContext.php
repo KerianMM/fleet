@@ -3,39 +3,22 @@
 namespace Kerianmm\Fleet\Tests\Integration\ParkVehicle;
 
 use Behat\Behat\Context\Context;
+use Kerianmm\Fleet\App\Command\ParkCommand;
 use Kerianmm\Fleet\Domain\Exception\CantLocalizeVehicleToTheSameLocation;
 use Kerianmm\Fleet\Domain\Model\Fleet;
 use Kerianmm\Fleet\Domain\Model\Location;
 use Kerianmm\Fleet\Domain\Model\Vehicle;
+use Kerianmm\Fleet\Tests\Integration\BootedContainerTrait;
 
 final class ParkVehicleContext implements Context
 {
+    use BootedContainerTrait;
+
     private ?Fleet $fleet                                                               = null;
     private ?Vehicle $vehicle                                                           = null;
     private ?Location $location                                                         = null;
     // Implementation doubt : a simple bool is enough
     private ?CantLocalizeVehicleToTheSameLocation $cantLocalizeVehicleToTheSameLocation = null;
-
-    public function getFleet(): Fleet
-    {
-        return $this->fleet ?? throw new \RuntimeException(
-            sprintf('Please, init "%s::fleet" field before using', __CLASS__),
-        );
-    }
-
-    public function getVehicle(): Vehicle
-    {
-        return $this->vehicle ?? throw new \RuntimeException(
-            sprintf('Please, init "%s::vehicle" field before using', __CLASS__),
-        );
-    }
-
-    public function getLocation(): Location
-    {
-        return $this->location ?? throw new \RuntimeException(
-            sprintf('Please, init "%s::location" field before using', __CLASS__),
-        );
-    }
 
     /**
      * @Given /^my fleet$/
@@ -43,6 +26,7 @@ final class ParkVehicleContext implements Context
     public function withFleet(): void
     {
         $this->fleet = Fleet::create('any-user');
+        $this->fleetRepository->save($this->getFleet());
     }
 
     /**
@@ -51,6 +35,7 @@ final class ParkVehicleContext implements Context
     public function withVehicle(): void
     {
         $this->vehicle = new Vehicle('AZ-123-ER');
+        $this->vehicleRepository->save($this->getVehicle());
     }
 
     /**
@@ -64,19 +49,32 @@ final class ParkVehicleContext implements Context
     /**
      * @Given /^I have registered this vehicle into my fleet$/
      */
-    public function registerVehicle(): void
+    public function withRegisteredVehicle(): void
     {
         $this->getFleet()->registerVehicle($this->getVehicle());
+        $this->fleetRepository->save($this->getFleet());
     }
 
     /**
      * @Given /^my vehicle has been parked into this location$/
-     *
-     * @When  /^I park my vehicle at this location$/
+     */
+    public function withParkedVehicle(): void
+    {
+        $this->getVehicle()->localize($this->getLocation());
+        $this->vehicleRepository->save($this->getVehicle());
+    }
+
+    /**
+     * @When /^I park my vehicle at this location$/
      */
     public function parkVehicle(): void
     {
-        $this->getVehicle()->localize($this->getLocation());
+        $this->commandBus->dispatch(new ParkCommand(
+            fleetId: $this->getFleet()->id,
+            plateNumber: $this->getVehicle()->plateNumber,
+            latitude: $this->getLocation()->latitude,
+            longitude: $this->getLocation()->longitude,
+        ));
     }
 
     /**
@@ -85,7 +83,12 @@ final class ParkVehicleContext implements Context
     public function parkVehicleTwice(): void
     {
         try {
-            $this->getVehicle()->localize($this->getLocation());
+            $this->commandBus->dispatch(new ParkCommand(
+                fleetId: $this->getFleet()->id,
+                plateNumber: $this->getVehicle()->plateNumber,
+                latitude: $this->getLocation()->latitude,
+                longitude: $this->getLocation()->longitude,
+            ));
         } catch (CantLocalizeVehicleToTheSameLocation $cantLocalizeVehicleToTheSameLocation) {
             $this->cantLocalizeVehicleToTheSameLocation = $cantLocalizeVehicleToTheSameLocation;
         }
@@ -113,5 +116,26 @@ final class ParkVehicleContext implements Context
         if (null === $this->cantLocalizeVehicleToTheSameLocation) {
             throw new \RuntimeException('I should be informed that my vehicle is already parked at this location');
         }
+    }
+
+    private function getFleet(): Fleet
+    {
+        return $this->fleet ?? throw new \RuntimeException(
+            sprintf('Please, init "%s::fleet" field before using', __CLASS__),
+        );
+    }
+
+    private function getVehicle(): Vehicle
+    {
+        return $this->vehicle ?? throw new \RuntimeException(
+            sprintf('Please, init "%s::vehicle" field before using', __CLASS__),
+        );
+    }
+
+    private function getLocation(): Location
+    {
+        return $this->location ?? throw new \RuntimeException(
+            sprintf('Please, init "%s::location" field before using', __CLASS__),
+        );
     }
 }

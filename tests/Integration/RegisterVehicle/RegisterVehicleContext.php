@@ -3,12 +3,16 @@
 namespace Kerianmm\Fleet\Tests\Integration\RegisterVehicle;
 
 use Behat\Behat\Context\Context;
+use Kerianmm\Fleet\App\Command\RegisterVehicleCommand;
 use Kerianmm\Fleet\Domain\Exception\CantRegisterSameVehicleTwice;
 use Kerianmm\Fleet\Domain\Model\Fleet;
 use Kerianmm\Fleet\Domain\Model\Vehicle;
+use Kerianmm\Fleet\Tests\Integration\BootedContainerTrait;
 
 final class RegisterVehicleContext implements Context
 {
+    use BootedContainerTrait;
+
     private ?Fleet $fleet                                               = null;
     private ?Fleet $anotherFleet                                        = null;
     private ?Vehicle $vehicle                                           = null;
@@ -21,6 +25,7 @@ final class RegisterVehicleContext implements Context
     public function withFleet(): void
     {
         $this->fleet = Fleet::create('any-user');
+        $this->fleetRepository->save($this->getFleet());
     }
 
     /**
@@ -29,6 +34,7 @@ final class RegisterVehicleContext implements Context
     public function withAnotherFleet(): void
     {
         $this->anotherFleet = Fleet::create('another-user');
+        $this->fleetRepository->save($this->getAnotherFleet());
     }
 
     /**
@@ -37,24 +43,36 @@ final class RegisterVehicleContext implements Context
     public function withVehicle(): void
     {
         $this->vehicle = new Vehicle('AZ-123-ER');
+        $this->vehicleRepository->save($this->getVehicle());
     }
 
     /**
      * @Given /^I have registered this vehicle into my fleet$/
-     *
-     * @When /^I register this vehicle into my fleet$/
      */
-    public function registerVehicle(): void
+    public function withRegisteredVehicle(): void
     {
         $this->getFleet()->registerVehicle($this->getVehicle());
+        $this->fleetRepository->save($this->getFleet());
     }
 
     /**
      * @Given /^this vehicle has been registered into the other user's fleet$/
      */
-    public function registerVehicleInAnotherFleet(): void
+    public function withVehicleRegisteredInAnotherFleet(): void
     {
         $this->getAnotherFleet()->registerVehicle($this->getVehicle());
+        $this->fleetRepository->save($this->getAnotherFleet());
+    }
+
+    /**
+     * @When /^I register this vehicle into my fleet$/
+     */
+    public function registerVehicle(): void
+    {
+        $this->commandBus->dispatch(new RegisterVehicleCommand(
+            fleetId: $this->getFleet()->id,
+            plateNumber: $this->getVehicle()->plateNumber,
+        ));
     }
 
     /**
@@ -63,7 +81,10 @@ final class RegisterVehicleContext implements Context
     public function registerVehicleTwice(): void
     {
         try {
-            $this->getFleet()->registerVehicle($this->getVehicle());
+            $this->commandBus->dispatch(new RegisterVehicleCommand(
+                fleetId: $this->getFleet()->id,
+                plateNumber: $this->getVehicle()->plateNumber,
+            ));
         } catch (CantRegisterSameVehicleTwice $cantRegisterSameVehicleTwice) {
             $this->cantRegisterSameVehicleTwice = $cantRegisterSameVehicleTwice;
         }
