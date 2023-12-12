@@ -8,6 +8,8 @@ use Kerianmm\Fleet\App\Command\ParkCommand;
 use Kerianmm\Fleet\App\Command\ParkCommandHandler;
 use Kerianmm\Fleet\App\Command\RegisterVehicleCommand;
 use Kerianmm\Fleet\App\Command\RegisterVehicleCommandHandler;
+use Kerianmm\Fleet\App\Query\LocationQuery;
+use Kerianmm\Fleet\App\Query\LocationQueryHandler;
 use Kerianmm\Fleet\App\Shared\Command\CommandBusInterface;
 use Kerianmm\Fleet\App\Shared\Container\ContainerInterface;
 use Kerianmm\Fleet\App\Shared\Query\QueryBusInterface;
@@ -37,6 +39,7 @@ final class Container implements ContainerInterface
         $container->set(CreateFleetCommand::class, new CreateFleetCommandHandler($container));
         $container->set(RegisterVehicleCommand::class, new RegisterVehicleCommandHandler($container));
         $container->set(ParkCommand::class, new ParkCommandHandler($container));
+        $container->set(LocationQuery::class, new LocationQueryHandler($container));
 
         return $container;
     }

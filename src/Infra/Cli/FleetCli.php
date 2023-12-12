@@ -5,10 +5,13 @@ namespace Kerianmm\Fleet\Infra\Cli;
 use Kerianmm\Fleet\App\Command\CreateFleetCommand;
 use Kerianmm\Fleet\App\Command\ParkCommand;
 use Kerianmm\Fleet\App\Command\RegisterVehicleCommand;
+use Kerianmm\Fleet\App\Query\LocationQuery;
 use Kerianmm\Fleet\App\Shared\Command\CommandBusInterface;
+use Kerianmm\Fleet\App\Shared\Query\QueryBusInterface;
 use Kerianmm\Fleet\Domain\Exception\CantLocalizeVehicleToTheSameLocation;
 use Kerianmm\Fleet\Domain\Exception\CantRegisterSameVehicleTwice;
 use Kerianmm\Fleet\Domain\Model\Fleet;
+use Kerianmm\Fleet\Domain\Model\Location;
 use Kerianmm\Fleet\Infra\Shared\Container\Container;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\QuestionHelper;
@@ -26,13 +29,17 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 final class FleetCli extends SingleCommandApplication
 {
     private CommandBusInterface $commandBus;
+    private QueryBusInterface $queryBus;
 
     public function __construct()
     {
         parent::__construct('Manage fleets');
 
-        // @phpstan-ignore-next-line
-        $this->commandBus = Container::boot()->get(CommandBusInterface::class);
+        $container = Container::boot();
+        /** @phpstan-ignore-next-line */
+        $this->commandBus = $container->get(CommandBusInterface::class);
+        /** @phpstan-ignore-next-line */
+        $this->queryBus = $container->get(QueryBusInterface::class);
 
         $this->setCode(function (InputInterface $input, OutputInterface $output): int {
             /** @var QuestionHelper $questionHelper */
@@ -77,10 +84,12 @@ final class FleetCli extends SingleCommandApplication
         $fleetId     = $questionHelper->ask($input, $output, new Question('Fleet id :'));
         /** @var string $plateNumber */
         $plateNumber = $questionHelper->ask($input, $output, new Question('Vehicle plateNumber :'));
-        /** @var float $latitude */
+        /** @var string $latitude */
         $latitude    = $questionHelper->ask($input, $output, new Question('Latitude :'));
-        /** @var float $longitude */
+        $latitude    = (float) $latitude;
+        /** @var string $longitude */
         $longitude   = $questionHelper->ask($input, $output, new Question('Longitude :'));
+        $longitude   = (float) $longitude;
 
         $io = new SymfonyStyle($input, $output);
 
@@ -94,19 +103,39 @@ final class FleetCli extends SingleCommandApplication
         return $this->menu($questionHelper, $input, $output);
     }
 
+    private function askVehicleLocalization(QuestionHelper $questionHelper, InputInterface $input, OutputInterface $output): int {
+        /** @var string $fleetId */
+        $fleetId     = $questionHelper->ask($input, $output, new Question('Fleet id :'));
+        /** @var string $plateNumber */
+        $plateNumber = $questionHelper->ask($input, $output, new Question('Vehicle plateNumber :'));
+
+        $io = new SymfonyStyle($input, $output);
+
+        $location = $this->queryBus->dispatch(new LocationQuery($fleetId, $plateNumber));
+        if ($location instanceof Location) {
+            $io->success(sprintf('Vehicle "%s" localized at "%s" "%s"', $plateNumber, $location->latitude, $location->longitude));
+        } else {
+            $io->warning(sprintf('Vehicle "%s" is not localized', $plateNumber));
+        }
+
+        return $this->menu($questionHelper, $input, $output);
+    }
+
     private function menu(QuestionHelper $questionHelper, InputInterface $input, OutputInterface $output): int {
         $answer = $questionHelper->ask($input, $output, new ChoiceQuestion('Select an action :', [
             'create fleet',
             'register vehicle',
             'park vehicle',
+            'ask vehicle localization',
             'exit',
         ]));
 
         return match ($answer) {
-            'register vehicle' => $this->registerVehicle($questionHelper, $input, $output),
-            'park vehicle'     => $this->parkVehicle($questionHelper, $input, $output),
-            'create fleet'     => $this->createFleet($questionHelper, $input, $output),
-            default            => Command::SUCCESS,
+            'register vehicle'          => $this->registerVehicle($questionHelper, $input, $output),
+            'park vehicle'              => $this->parkVehicle($questionHelper, $input, $output),
+            'create fleet'              => $this->createFleet($questionHelper, $input, $output),
+            'ask vehicle localization'  => $this->askVehicleLocalization($questionHelper, $input, $output),
+            default                     => Command::SUCCESS,
         };
     }
 }
