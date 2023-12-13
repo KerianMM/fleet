@@ -6,6 +6,14 @@ use Kerianmm\Fleet\Domain\Exception\FleetNotFound;
 use Kerianmm\Fleet\Domain\Model\Fleet;
 use Kerianmm\Fleet\Domain\Repository\FleetRepositoryInterface;
 
+/**
+ * TODO: use sqlite
+ *  - Table fleets with id and user_id
+ *  - Table vehicles with plate_number and location
+ *  - Table fleets_vehicles with plate_number and fleet_id
+ *
+ * Not done because pending time without any dependency
+ */
 final class FleetRepository implements FleetRepositoryInterface
 {
     public function __construct(private array $fleets = [])
